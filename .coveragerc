@@ -1,0 +1,6 @@
+[run]
+source = axonclient
+omit =
+    */python?.?/*
+    */test_?.py
+    */tests/*
