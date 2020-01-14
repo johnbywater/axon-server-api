@@ -1,4 +1,9 @@
-# AxonServer API Specification
+# Python client for Axon Server 
+
+This Python package is a "work in progress" client for Axon Server. It will support event sourcing and event driven architecture in Python using the Axon Server. It will support writing stored events, writing snapshots, reading the events of an aggregate, and reading the events of an application. The initial motivation for developing this client is to adapt the Axon Server as a record manager in the Python eventsourcing library, but by writing a separate package, this client can be used by other projects too.
+
+
+## AxonServer API Specification
 
 This module contains the protobuf definitions of the services and messages provided by
 AxonServer.
