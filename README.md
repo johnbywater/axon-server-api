@@ -1,8 +1,8 @@
 # Python client for Axon Server 
 
-[![Latest Release](https://badge.fury.io/py/axonclient.svg)](https://pypi.org/project/axonclient/)
-[![Build Status](https://travis-ci.org/johnbywater/axonclient.svg?branch=master)](https://travis-ci.org/johnbywater/axonclient)
-[![Coverage Status](https://coveralls.io/repos/github/johnbywater/axonclient/badge.svg?branch=master)](https://coveralls.io/github/johnbywater/axonclient)
+[![Latest Release](https://badge.fury.io/py/python-axon-client.svg)](https://pypi.org/project/python-axon-client/)
+[![Build Status](https://travis-ci.org/johnbywater/python-axon-client.svg?branch=master)](https://travis-ci.org/johnbywater/python-axon-client)
+[![Coverage Status](https://coveralls.io/repos/github/johnbywater/python-axon-client/badge.svg?branch=master)](https://coveralls.io/github/johnbywater/python-axon-client)
 
 This Python package is a "work in progress" client for Axon Server. It will support event sourcing and event driven architecture in Python using the Axon Server. It will support writing stored events, writing snapshots, reading the events of an aggregate, and reading the events of an application. The initial motivation for developing this client is to adapt the Axon Server as a record manager in the Python eventsourcing library, but by writing a separate package, this client can be used by other projects too.
 
