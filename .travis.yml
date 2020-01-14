@@ -15,7 +15,7 @@ before_install:
 
   # Run Axon Server.
   - ./axonserver/axonserver.jar &
-  - sleep 60  # wait for the server to start (replace this with polling?)
+  - sleep 30  # wait for the server to start (replace this with polling?)
 
 install:
   - pip install -U virtualenv
