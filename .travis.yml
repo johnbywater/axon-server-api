@@ -14,7 +14,7 @@ before_install:
   - ./dev/download_axon_server.sh
 
   # Run Axon Server.
-  - ./axonserver/axonserver.jar
+  - ./axonserver/axonserver.jar &
   - sleep 60  # wait for the server to start (replace this with polling?)
 
 install:
