@@ -1,6 +1,6 @@
 # Python client for Axon Server 
 
-[![Latest Release](https://badge.fury.io/py/python-axon-client.svg)](https://pypi.org/project/python-axon-client/)
+[![Latest Release](https://badge.fury.io/py/axonclient.svg)](https://pypi.org/project/axonclient/)
 [![Build Status](https://travis-ci.org/johnbywater/python-axon-client.svg?branch=master)](https://travis-ci.org/johnbywater/python-axon-client)
 [![Coverage Status](https://coveralls.io/repos/github/johnbywater/python-axon-client/badge.svg?branch=master)](https://coveralls.io/github/johnbywater/python-axon-client)
 

@@ -1,12 +1,13 @@
-from typing import Iterable, Optional, Union
+from typing import Iterable, Union
 from uuid import UUID
 
 import grpc
-from grpc._channel import _MultiThreadedRendezvous
 
 from axonclient.common_pb2 import SerializedObject
-from axonclient.event_pb2 import Event, GetAggregateEventsRequest, PayloadDescription
+from axonclient.event_pb2 import Event, GetAggregateEventsRequest, GetEventsRequest
 from axonclient.event_pb2_grpc import EventStoreStub
+
+DEFAULT_LOCAL_AXONSERVER_URI = "localhost:8124"
 
 
 class AxonEvent(object):
@@ -21,8 +22,9 @@ class AxonEvent(object):
         payload_revision: str,
         payload_data: bytes,
         snapshot: bool,
-        meta_data: dict,
+        meta_data: dict,  # Todo: Improve definition (MetaDataValue)
     ):
+        assert aggregate_type, "Non-empty string required (otherwise can't get events)"
         self.message_identifier = message_identifier
         self.aggregate_identifier = aggregate_identifier
         self.aggregate_sequence_number = aggregate_sequence_number
@@ -72,32 +74,54 @@ class AxonClient:
         self.channel = grpc.insecure_channel(self.uri)
         self.event_store_stub = EventStoreStub(self.channel)
 
-    def list_aggregate_events(self, aggregate_id: UUID, initial_sequence: int, allow_snapshots: bool):
-        return list(self.iter_aggregate_events(aggregate_id, initial_sequence, allow_snapshots))
+    def list_aggregate_events(
+        self, aggregate_id: UUID, initial_sequence: int, allow_snapshots: bool
+    ):
+        return list(
+            self.iter_aggregate_events(aggregate_id, initial_sequence, allow_snapshots)
+        )
 
-    def iter_aggregate_events(self, aggregate_id: UUID, initial_sequence: int, allow_snapshots: bool):
+    def iter_aggregate_events(
+        self, aggregate_id: UUID, initial_sequence: int, allow_snapshots: bool
+    ):
         request = GetAggregateEventsRequest(
-            aggregate_id=aggregate_id.hex,
+            aggregate_id=str(aggregate_id),
             initial_sequence=initial_sequence,
             allow_snapshots=allow_snapshots,
         )
+        # print("Querying for aggregate events: ", aggregate_id)
         response = self.event_store_stub.ListAggregateEvents(request)
+        # has_events = False
         for event in response:
+            # print("Read GRPC event: ", event)
             yield AxonEvent.from_grpc(event)
+            # has_events = True
+
+        # if not has_events:
+            # print("No events for: ", aggregate_id)
 
     def append_event(self, events: Union[AxonEvent, Iterable[AxonEvent]]):
         if isinstance(events, AxonEvent):
             events = [events]
-        confirmation = self.event_store_stub.AppendEvent(
-            (event.to_grpc() for event in events)
-        )
+        events = [event.to_grpc() for event in events]
+        # print("Appending GRPC Events:")
+        # print("\n\n".join([str(e) for e in events]))
+        confirmation = self.event_store_stub.AppendEvent(iter(events))
         assert confirmation.success, "Operation failed"
 
-    def list_snapshot_events(self, aggregate_id, initial_sequence, max_sequence, max_reults):
-        return list(self.iter_snapshot_events(aggregate_id, initial_sequence, max_sequence, max_reults))
+    def list_snapshot_events(
+        self, aggregate_id, initial_sequence, max_sequence, max_reults
+    ):
+        return list(
+            self.iter_snapshot_events(
+                aggregate_id, initial_sequence, max_sequence, max_reults
+            )
+        )
 
-    def iter_snapshot_events(self, aggregate_id, initial_sequence, max_sequence, max_reults):
-        request = GetAggregateEventsRequest(aggregate_id=aggregate_id.hex)
+    def iter_snapshot_events(
+        self, aggregate_id, initial_sequence, max_sequence, max_reults
+    ):
+        request = GetAggregateEventsRequest(aggregate_id=str(aggregate_id))
         response = self.event_store_stub.ListAggregateSnapshots(request)
         for event in response:
             yield AxonEvent.from_grpc(event)
@@ -105,3 +129,47 @@ class AxonClient:
     def append_snapshot(self, event: AxonEvent):
         confirmation = self.event_store_stub.AppendSnapshot(event.to_grpc())
         assert confirmation.success, "Operation failed"
+
+    def close_connection(self):
+        self.channel.close()
+
+    def list_events(
+        self,
+        tracking_token: int=0,
+        number_of_permits: int=1000,
+        client_id: str='',
+        component_name: str='',
+        processor: str='',
+        blacklist: Iterable=(),
+    ):
+        return list(
+            self.iter_events(
+                tracking_token,
+                number_of_permits,
+                client_id,
+                component_name,
+                processor,
+                blacklist,
+            )
+        )
+
+    def iter_events(
+        self,
+        tracking_token: int,
+        number_of_permits: int,
+        client_id: str,
+        component_name: str,
+        processor: str,
+        blacklist: Iterable,
+    ):
+        request = GetEventsRequest(
+            tracking_token=tracking_token,
+            number_of_permits=number_of_permits,
+            client_id=client_id,
+            component_name=component_name,
+            processor=processor,
+            blacklist=blacklist,
+        )
+        response = self.event_store_stub.ListEvents(iter([request]))
+        for event_with_token in response:
+            yield event_with_token.token, AxonEvent.from_grpc(event_with_token.event)
