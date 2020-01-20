@@ -157,18 +157,17 @@ class TestAxonClient(TestCase):
     def test_append_and_list_snapshot_events(self):
         uri = "localhost:8124"
         client = AxonClient(uri)
-        aggregate_id = uuid4()
+        aggregate_id = str(uuid4())
 
         # Check there are no snapshots for this aggregate.
-        # result = client.list_snapshot_events(aggregate_id, 0, 1, 1)
-        result = client.list_aggregate_events(aggregate_id, 0, allow_snapshots=True)
+        result = client.list_snapshot_events(aggregate_id)
         self.assertEqual(result, [])
 
         # Append a snapshot for this aggregate.
         client.append_snapshot(
             AxonEvent(
                 message_identifier="1",
-                aggregate_identifier=str(aggregate_id),
+                aggregate_identifier=aggregate_id,
                 aggregate_sequence_number=0,
                 aggregate_type="AggregateRoot",
                 timestamp=0,
@@ -181,25 +180,24 @@ class TestAxonClient(TestCase):
         )
 
         # Check there is one snapshot for this aggregate.
-        # result = client.list_snapshot_events(aggregate_id, 0, 1, 1)
-        result = client.list_aggregate_events(aggregate_id, 0, allow_snapshots=True)
+        result = client.list_snapshot_events(aggregate_id)
         self.assertEqual(len(result), 1)
 
         stored_snapshot = result[0]
         self.assertIsInstance(stored_snapshot, AxonEvent)
         self.assertEqual(stored_snapshot.aggregate_sequence_number, 0)
         self.assertEqual(stored_snapshot.message_identifier, "1")
-        self.assertEqual(stored_snapshot.aggregate_identifier, str(aggregate_id))
+        self.assertEqual(stored_snapshot.aggregate_identifier, aggregate_id)
 
         # Fail to append snapshot at same position.
         client.append_snapshot(
             AxonEvent(
                 message_identifier="2",
-                aggregate_identifier=str(aggregate_id),
+                aggregate_identifier=aggregate_id,
                 aggregate_sequence_number=1,
                 aggregate_type="AggregateRoot",
                 timestamp=1,
-                payload_type='',
+                payload_type='a',
                 payload_revision='1',
                 payload_data=b'',
                 snapshot=True,
@@ -207,11 +205,10 @@ class TestAxonClient(TestCase):
             )
         )
 
-        result = client.list_aggregate_events(aggregate_id, 0, allow_snapshots=True)
-        # result = client.list_snapshot_events(aggregate_id, 1, 2, 1)
-        self.assertEqual(len(result), 1)
+        result = client.list_snapshot_events(aggregate_id)
+        self.assertEqual(len(result), 2)
         stored_snapshot = result[0]
         self.assertIsInstance(stored_snapshot, AxonEvent)
         self.assertEqual(stored_snapshot.aggregate_sequence_number, 1)
         self.assertEqual(stored_snapshot.message_identifier, "2")
-        self.assertEqual(stored_snapshot.aggregate_identifier, str(aggregate_id))
+        self.assertEqual(stored_snapshot.aggregate_identifier, aggregate_id)

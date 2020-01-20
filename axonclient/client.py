@@ -2,9 +2,10 @@ from typing import Iterable, Union
 from uuid import UUID
 
 import grpc
+from google.protobuf.internal.wire_format import INT32_MAX, INT64_MAX
 
 from axonclient.common_pb2 import SerializedObject
-from axonclient.event_pb2 import Event, GetAggregateEventsRequest, GetEventsRequest
+from axonclient.event_pb2 import Event, GetAggregateEventsRequest, GetEventsRequest, GetAggregateSnapshotsRequest
 from axonclient.event_pb2_grpc import EventStoreStub
 
 DEFAULT_LOCAL_AXONSERVER_URI = "localhost:8124"
@@ -110,18 +111,30 @@ class AxonClient:
         assert confirmation.success, "Operation failed"
 
     def list_snapshot_events(
-        self, aggregate_id, initial_sequence, max_sequence, max_reults
+        self, aggregate_id: str, initial_sequence=0, max_sequence=INT64_MAX, max_results=INT32_MAX
     ):
+        """
+        Returns list of snapshots of aggregate_id, in reverse order.
+        """
         return list(
             self.iter_snapshot_events(
-                aggregate_id, initial_sequence, max_sequence, max_reults
+                aggregate_id, initial_sequence, max_sequence, max_results
             )
         )
 
     def iter_snapshot_events(
-        self, aggregate_id, initial_sequence, max_sequence, max_reults
+        self, aggregate_id: str, initial_sequence=0, max_sequence=INT64_MAX, max_results=INT32_MAX
     ):
-        request = GetAggregateEventsRequest(aggregate_id=str(aggregate_id))
+        """
+        Returns iterator of snapshots of aggregate_id, in reverse order.
+        """
+        assert isinstance(aggregate_id, str)
+        request = GetAggregateSnapshotsRequest(
+            aggregate_id=aggregate_id,
+            initial_sequence=initial_sequence,
+            max_sequence=max_sequence,
+            max_results=max_results,
+        )
         response = self.event_store_stub.ListAggregateSnapshots(request)
         for event in response:
             yield AxonEvent.from_grpc(event)
