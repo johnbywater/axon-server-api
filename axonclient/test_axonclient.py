@@ -1,11 +1,11 @@
 import http.client
-from unittest import TestCase, skip
+from unittest import TestCase
 from uuid import uuid4
 
-from grpc import StatusCode
-from grpc._channel import _InactiveRpcError, _MultiThreadedRendezvous
+from grpc._channel import _MultiThreadedRendezvous
 
 from axonclient.client import AxonClient, AxonEvent, DEFAULT_LOCAL_AXONSERVER_URI
+from axonclient.exceptions import OutOfRangeError
 
 
 class TestAxonClient(TestCase):
@@ -21,14 +21,14 @@ class TestAxonClient(TestCase):
     def test_failing_to_connect_raises_exception(self):
         uri = "localhost:81244444"  # wrong port
         client = AxonClient(uri)
-        aggregate_id = uuid4()
+        aggregate_id = str(uuid4())
         with self.assertRaises(_MultiThreadedRendezvous):
             client.list_aggregate_events(aggregate_id, 0, False)
 
     def test_append_and_list_aggregate_events(self):
         # Connect to Axon Server.
         client = AxonClient(DEFAULT_LOCAL_AXONSERVER_URI)
-        aggregate_id = uuid4()
+        aggregate_id = str(uuid4())
 
         # Check there are zero events in the aggregate sequence.
         result = client.list_aggregate_events(aggregate_id, 0, False)
@@ -41,11 +41,9 @@ class TestAxonClient(TestCase):
         # Append a single event.
         client.append_event(
             AxonEvent(
-                message_identifier="1sdfsdf",
-                aggregate_identifier=str(aggregate_id),
+                aggregate_identifier=aggregate_id,
                 aggregate_sequence_number=0,
                 aggregate_type="AggregateRoot",
-                timestamp=967868768,
                 payload_type=event_topic,
                 payload_revision=event_revision,
                 payload_data=event_state,
@@ -59,14 +57,12 @@ class TestAxonClient(TestCase):
         self.assertEqual(len(result), 1)
 
         # Fail to append event at same position.
-        with self.assertRaises(_InactiveRpcError) as context:
+        with self.assertRaises(OutOfRangeError) as context:
             client.append_event(
                 AxonEvent(
-                    message_identifier="1sdfsdf",
-                    aggregate_identifier=str(aggregate_id),
+                    aggregate_identifier=aggregate_id,
                     aggregate_sequence_number=0,
                     aggregate_type="AggregateRoot",
-                    timestamp=967868768,
                     payload_type=event_topic,
                     payload_revision=event_revision,
                     payload_data=event_state,
@@ -74,8 +70,7 @@ class TestAxonClient(TestCase):
                     meta_data={},
                 )
             )
-        self.assertEqual(context.exception.args[0].code, StatusCode.OUT_OF_RANGE)
-        self.assertIn('Invalid sequence number', context.exception.args[0].details)
+        self.assertIn("Invalid sequence number", context.exception.args[0])
 
         # Check there is still only one event in the aggregate sequence.
         result = client.list_aggregate_events(aggregate_id, 0, False)
@@ -83,76 +78,93 @@ class TestAxonClient(TestCase):
 
         stored_event = result[0]
         self.assertIsInstance(stored_event, AxonEvent)
-        self.assertEqual(stored_event.message_identifier, "1sdfsdf")
-        self.assertEqual(stored_event.aggregate_identifier, str(aggregate_id))
+        self.assertEqual(stored_event.aggregate_identifier, aggregate_id)
         self.assertEqual(stored_event.aggregate_sequence_number, 0)
         self.assertEqual(stored_event.payload_type, event_topic)
         self.assertEqual(stored_event.payload_revision, event_revision)
         self.assertEqual(stored_event.payload_data, event_state)
 
         # Append two more events.
-        client.append_event([
-            AxonEvent(
-                message_identifier="1sdfsdf",
-                aggregate_identifier=str(aggregate_id),
-                aggregate_sequence_number=1,
-                aggregate_type="AggregateRoot",
-                timestamp=967868768,
-                payload_type=event_topic,
-                payload_revision=event_revision,
-                payload_data=event_state,
-                snapshot=False,
-                meta_data={},
-            ),
-            AxonEvent(
-                message_identifier="1sdfsdf",
-                aggregate_identifier=str(aggregate_id),
-                aggregate_sequence_number=2,
-                aggregate_type="AggregateRoot",
-                timestamp=967868768,
-                payload_type=event_topic,
-                payload_revision=event_revision,
-                payload_data=event_state,
-                snapshot=False,
-                meta_data={},
-            )
-        ])
+        client.append_event(
+            [
+                AxonEvent(
+                    aggregate_identifier=aggregate_id,
+                    aggregate_sequence_number=1,
+                    aggregate_type="AggregateRoot",
+                    payload_type=event_topic,
+                    payload_revision=event_revision,
+                    payload_data=event_state,
+                    snapshot=False,
+                    meta_data={},
+                ),
+                AxonEvent(
+                    aggregate_identifier=aggregate_id,
+                    aggregate_sequence_number=2,
+                    aggregate_type="AggregateRoot",
+                    payload_type=event_topic,
+                    payload_revision=event_revision,
+                    payload_data=event_state,
+                    snapshot=False,
+                    meta_data={},
+                ),
+            ]
+        )
 
         # Check there are three events in the aggregate sequence.
         result = client.list_aggregate_events(aggregate_id, 0, False)
         self.assertEqual(len(result), 3)
 
-    @skip("ListEvents not working at the mo")
     def test_list_application_events(self):
         uri = "localhost:8124"
         client = AxonClient(uri)
 
-        # Check there are zero events in the application sequence.
-        result = client.list_events(0, 1000, '', '', '', [])
+        # Get the next token.
+        last_token = client.get_last_token()
+        next_token = last_token + 1
+
+        # Check listing returns zero events in the application sequence since the next token.
+        result = client.list_events(tracking_token=next_token, number_of_permits=10)
         self.assertEqual(len(result), 0)
 
-        event_topic = "event topic"
+        event_topic = "eventtopic"
         event_revision = "1"
         event_state = b"123456789"
-        aggregate_id = uuid4()
+        aggregate_id = str(uuid4())
 
-        # Append a single event.
+        # Append two events.
         client.append_event(
-            AxonEvent(
-                message_identifier="1sdfsdf",
-                aggregate_identifier=str(aggregate_id),
-                aggregate_sequence_number=0,
-                aggregate_type="AggregateRoot",
-                timestamp=967868768,
-                payload_type=event_topic,
-                payload_revision=event_revision,
-                payload_data=event_state,
-                snapshot=False,
-                meta_data={},
-            )
+            [
+                AxonEvent(
+                    aggregate_identifier=aggregate_id,
+                    aggregate_sequence_number=0,
+                    aggregate_type="AggregateRoot",
+                    payload_type=event_topic,
+                    payload_revision=event_revision,
+                    payload_data=event_state,
+                ),
+                AxonEvent(
+                    aggregate_identifier=aggregate_id,
+                    aggregate_sequence_number=1,
+                    aggregate_type="AggregateRoot",
+                    payload_type=event_topic,
+                    payload_revision=event_revision,
+                    payload_data=event_state,
+                ),
+            ]
         )
 
-        self.assertEqual(len(result), 1)
+        # Check listing returns one event in the application sequence since the next token.
+        result = client.list_events(tracking_token=next_token, number_of_permits=10)
+        for token, axon_event in result:
+            assert isinstance(axon_event, AxonEvent), type(axon_event)
+            print(
+                axon_event.aggregate_identifier,
+                axon_event.aggregate_sequence_number,
+                axon_event.payload_type,
+                axon_event.payload_data,
+            )
+
+        self.assertTrue(len(result) > 0, "There were %s events" % len(result))
 
     def test_append_and_list_snapshot_events(self):
         uri = "localhost:8124"
@@ -166,16 +178,13 @@ class TestAxonClient(TestCase):
         # Append a snapshot for this aggregate.
         client.append_snapshot(
             AxonEvent(
-                message_identifier="1",
                 aggregate_identifier=aggregate_id,
                 aggregate_sequence_number=0,
                 aggregate_type="AggregateRoot",
-                timestamp=0,
-                payload_type='',
-                payload_revision='1',
-                payload_data=b'',
+                payload_type="",
+                payload_revision="1",
+                payload_data=b"",
                 snapshot=True,
-                meta_data={},
             )
         )
 
@@ -186,22 +195,18 @@ class TestAxonClient(TestCase):
         stored_snapshot = result[0]
         self.assertIsInstance(stored_snapshot, AxonEvent)
         self.assertEqual(stored_snapshot.aggregate_sequence_number, 0)
-        self.assertEqual(stored_snapshot.message_identifier, "1")
         self.assertEqual(stored_snapshot.aggregate_identifier, aggregate_id)
 
         # Fail to append snapshot at same position.
         client.append_snapshot(
             AxonEvent(
-                message_identifier="2",
                 aggregate_identifier=aggregate_id,
                 aggregate_sequence_number=1,
                 aggregate_type="AggregateRoot",
-                timestamp=1,
-                payload_type='a',
-                payload_revision='1',
-                payload_data=b'',
+                payload_type="a",
+                payload_revision="1",
+                payload_data=b"",
                 snapshot=True,
-                meta_data={},
             )
         )
 
@@ -210,5 +215,4 @@ class TestAxonClient(TestCase):
         stored_snapshot = result[0]
         self.assertIsInstance(stored_snapshot, AxonEvent)
         self.assertEqual(stored_snapshot.aggregate_sequence_number, 1)
-        self.assertEqual(stored_snapshot.message_identifier, "2")
         self.assertEqual(stored_snapshot.aggregate_identifier, aggregate_id)
