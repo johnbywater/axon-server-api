@@ -178,10 +178,10 @@ class AxonClient:
         self,
         tracking_token: int = 0,
         number_of_permits: int = INT32_MAX,
-        client_id: str = "a",
-        component_name: str = "b",
-        processor: str = "c",
-        blacklist: Iterable = iter([]),
+        client_id: str = "",
+        component_name: str = "",
+        processor: str = "",
+        blacklist: Iterable = (),
     ) -> List[Tuple[str, AxonEvent]]:
 
         return list(
@@ -197,12 +197,12 @@ class AxonClient:
 
     def iter_events(
         self,
-        tracking_token: int,
-        number_of_permits: int,
-        client_id: str,
-        component_name: str,
-        processor: str,
-        blacklist: Iterable,
+        tracking_token: int = 0,
+        number_of_permits: int = INT32_MAX,
+        client_id: str = "",
+        component_name: str = "",
+        processor: str = "",
+        blacklist: Iterable = (),
     ) -> Iterable[Tuple[str, AxonEvent]]:
 
         request = GetEventsRequest(
