@@ -153,18 +153,12 @@ class TestAxonClient(TestCase):
             ]
         )
 
-        # Check listing returns one event in the application sequence since the next token.
+        # Check listing returns two AxonEvents in the application sequence since the next token.
         result = client.list_events(tracking_token=next_token, number_of_permits=10)
         for token, axon_event in result:
             assert isinstance(axon_event, AxonEvent), type(axon_event)
-            print(
-                axon_event.aggregate_identifier,
-                axon_event.aggregate_sequence_number,
-                axon_event.payload_type,
-                axon_event.payload_data,
-            )
 
-        self.assertTrue(len(result) > 0, "There were %s events" % len(result))
+        self.assertEqual(len(result), 2, "There were %s events" % len(result))
 
     def test_append_and_list_snapshot_events(self):
         uri = "localhost:8124"
